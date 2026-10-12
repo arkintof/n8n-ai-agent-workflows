@@ -1,0 +1,259 @@
+{
+  "name": "AI Lead Qualifier \u2192 Slack",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "lead-qualifier",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "e4a142e5-ac23-46ab-8d41-041a0bed7a64",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        220,
+        300
+      ],
+      "webhookId": "888b7962-17a5-4696-a89e-49f1e38734a7"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Edit these two values. Any OpenAI-compatible endpoint works (OpenAI, Groq, OpenRouter, Together, local Ollama /v1).\nreturn [{ json: { ...$input.first().json, baseUrl: 'https://api.openai.com/v1', model: 'gpt-4o-mini' }, pairedItem: 0 }];"
+      },
+      "id": "59ed3a95-9061-4cec-a044-ca06b57adfa2",
+      "name": "Config",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const b = $json.body || $json;\nreturn [{ pairedItem: 0, json: { baseUrl: $json.baseUrl, model: $json.model, system: \"You are a B2B sales analyst. Score inbound leads 0-100 for fit and intent using BANT. Return JSON: {score:number, tier:'hot'|'warm'|'cold', summary:string, reasons:string[], next_step:string}.\", user: `Our ICP: ${b.icp || 'SaaS founders, 5-200 employees'}\\nLead form submission:\\n${JSON.stringify(b, null, 2)}` } }];"
+      },
+      "id": "0ad0d0cb-b8f8-4f58-8ec6-722f73ecda92",
+      "name": "Build Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.baseUrl }}/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ model: $json.model, temperature: 0.2, response_format: { type: 'json_object' }, messages: [ { role: 'system', content: $json.system }, { role: 'user', content: $json.user } ] }) }}",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "id": "c4d9cefb-cafe-4dc5-9667-d41a4163eddf",
+      "name": "LLM",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        880,
+        300
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE_ME",
+          "name": "LLM API Key (Authorization: Bearer ...)"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 3
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $json.choices?.[0]?.message?.content || '{}';\nlet out; try { out = JSON.parse(raw); } catch (e) { out = { error: 'LLM returned non-JSON', raw }; }\nreturn [{ json: { result: out }, pairedItem: 0 }];"
+      },
+      "id": "49e57291-4ba4-4e83-8382-e256c01eeedc",
+      "name": "Parse Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "content": "## AI Lead Qualifier \u2192 Slack\nPOST your form submission JSON here (name, email, company, message, budget...). Hot leads (score \u226570) are pinged to Slack.\n\n1. Create a Header Auth credential: name `Authorization`, value `Bearer YOUR_KEY`.\n2. Select it on the **LLM** node.\n3. Edit model/base URL in **Config**.",
+        "height": 300,
+        "width": 340
+      },
+      "id": "477c926e-da39-473a-93e7-ae122a7496ab",
+      "name": "Read Me",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        100,
+        -40
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json.result) }}"
+      },
+      "id": "04ac3a6d-8d71-4d7f-b977-5adc62f02988",
+      "name": "Respond",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1320,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "4d6b47fc-d42f-456e-9d5a-ce959b2807fe",
+              "leftValue": "={{ $json.result.score }}",
+              "rightValue": 70,
+              "operator": {
+                "type": "number",
+                "operation": "gte"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "50b07307-608e-42e3-9bd0-8cc7e0a21805",
+      "name": "Hot Lead?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1540,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://hooks.slack.com/services/REPLACE/WITH/YOUR_WEBHOOK",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ text: `\ud83d\udd25 Hot lead (${$json.result.score}): ${$json.result.summary}\\nNext step: ${$json.result.next_step}` }) }}",
+        "options": {}
+      },
+      "id": "873deea6-244c-4f49-b649-8b8e90ff0045",
+      "name": "Post to Slack",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1760,
+        200
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config": {
+      "main": [
+        [
+          {
+            "node": "Build Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Prompt": {
+      "main": [
+        [
+          {
+            "node": "LLM",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LLM": {
+      "main": [
+        [
+          {
+            "node": "Parse Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Result": {
+      "main": [
+        [
+          {
+            "node": "Respond",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Respond": {
+      "main": [
+        [
+          {
+            "node": "Hot Lead?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Hot Lead?": {
+      "main": [
+        [
+          {
+            "node": "Post to Slack",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "tags": []
+}
