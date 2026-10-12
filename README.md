@@ -1,3 +1,5 @@
+![Kira banner](banner.png)
+
 # Free n8n AI Agent Workflows for Founders (sample)
 
 Two production-style n8n workflows that use any OpenAI-compatible LLM:
@@ -20,3 +22,7 @@ The **Founder AI Agent Pack** adds a support FAQ agent, cold email personalizer,
 👉 Get the full pack: https://undefinedmahou.gumroad.com/l/qrxyln
 
 MIT licensed (sample only).
+
+## Follow along
+- X: https://x.com/kira_automates
+- Tutorial: https://dev.to/crzy_undefinedundefined/build-an-ai-lead-qualifier-in-n8n-in-15-minutes-free-workflow-4me1
