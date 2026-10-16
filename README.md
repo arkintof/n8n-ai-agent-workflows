@@ -24,5 +24,5 @@ The **Founder AI Agent Pack** adds a support FAQ agent, cold email personalizer,
 MIT licensed (sample only).
 
 ## Follow along
-- X: https://x.com/kira_automates
+- X: https://x.com/notkira_ok
 - Tutorial: https://dev.to/crzy_undefinedundefined/build-an-ai-lead-qualifier-in-n8n-in-15-minutes-free-workflow-4me1
